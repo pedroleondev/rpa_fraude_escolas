@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuração do banco de dados
-
 DB_CONFIG = {
     "host": os.getenv("MYSQL_HOST"),
     "port": os.getenv("MYSQL_PORT"),
@@ -19,6 +18,10 @@ DB_CONFIG = {
 # Conectar ao banco de dados
 
 def conectar_banco():
+    """
+    ✅Faz a conexão com o banco de dados.
+    🔵Retorna a conexão.
+    """
     try:
         conexao = mysql.connector.connect(**DB_CONFIG)
         print("✅ Conectado com sucesso ao banco de dados.")
@@ -30,6 +33,10 @@ def conectar_banco():
 # Criar tabela no banco de dados
 
 def criar_tabela():
+    """
+    ✅Cria a tabela 'fraudes'
+    🔵No banco de dados
+    """
     conexao = conectar_banco()
     if not conexao:
         return
@@ -73,8 +80,8 @@ def criar_tabela():
 
 def inserir_dados(dados):
     """
-    Insere múltiplos registros na tabela 'fraudes'.
-    Verifica duplicatas antes da inserção.
+    ✅Insere múltiplos registros na tabela 'fraudes'.
+    🔵Verifica duplicatas antes da inserção.
     """
     conexao = conectar_banco()
     if not conexao:
