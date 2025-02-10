@@ -44,13 +44,11 @@ def criar_tabela():
             CREATE TABLE IF NOT EXISTS fraudes (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 nome_documento VARCHAR(255) NOT NULL,
-                link_documento TEXT,
                 numero_processo VARCHAR(50),
                 data_autuacao DATE NOT NULL,
-                parte_1 VARCHAR(255),
-                parte_2 VARCHAR(255),
+                partes VARCHAR(255),
                 materia VARCHAR(255) NOT NULL,
-                objeto TEXT,
+                link_documento TEXT,
                 ano INT
             )
         """)
@@ -74,45 +72,60 @@ def criar_tabela():
 # Inserir dados na no banco de dados
 
 def inserir_dados(dados):
+    """
+    Insere múltiplos registros na tabela 'fraudes'.
+    Verifica duplicatas antes da inserção.
+    """
     conexao = conectar_banco()
     if not conexao:
         return
     
     cursor = conexao.cursor()
-
-
+    
     query = """
         INSERT INTO fraudes 
-        (nome_documento, link_documento, numero_processo, data_autuacao, 
-        parte_1, parte_2, materia, objeto, ano)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (nome_documento, numero_processo, data_autuacao, 
+        partes, materia, link_documento, ano)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
-
+    
     try:
-        # formatação dos dados antes da inserção (ETL)
-        dados_formatados = [
-            (
-                d["Nome_Documento"],
-                d["Link_Documento"],
-                " ".join(d["Numero_Processo"].split("\n")).strip(),
-                datetime.strptime(d["Data_Autuacao"], "%d/%m/%Y").date() if d["Data_Autuacao"] else None,
-                d["Parte_1"].strip() if d["Parte_1"] else None,
-                d["Parte_2"].strip() if d["Parte_2"] else None,
-                d["Materia"].strip(),
-                d["Objeto"].strip(),
-                int(d["Ano"]) if d["Ano"].isdigit() else None
-            )
-            for d in dados
-        ]
+        dados_formatados = []
+        
+        for d in dados:
+            num_processo = " ".join(d["Numero_Processo"].split("\n")).strip()
 
-   
-        cursor.executemany(query, dados_formatados)
-        conexao.commit()
-        print(f"✅ {cursor.rowcount} registro inseridos com sucesso!")
+            # 🔍 Verifica se o número do processo já existe no banco
+            cursor.execute("SELECT EXISTS(SELECT 1 FROM fraudes WHERE numero_processo = %s)", (num_processo,))
+            existe = cursor.fetchone()[0]
+            
+            if existe:
+                print(f"⚠ Registro já existe para o processo {num_processo}. Pulando inserção.")
+                continue  # Pula para o próximo dado
+            
+            # Formatar os dados corretamente e adicionar à lista
+            dados_formatados.append((
+                d["Nome_Documento"],
+                num_processo,
+                datetime.strptime(d["Data_Autuacao"], "%d/%m/%Y").date() if d["Data_Autuacao"] else None,
+                str(d["Partes"]),  # 🔥 Converte lista para string antes de salvar no banco
+                d["Materia"].strip(),
+                d["URL"].strip(),
+                int(d["Ano"]) if d["Ano"].isdigit() else None
+            ))
+
+        # 🔥 Só executa `executemany()` se houver registros novos
+        if dados_formatados:
+            cursor.executemany(query, dados_formatados)
+            conexao.commit()
+            print(f"✅ {cursor.rowcount} registros inseridos com sucesso!")
+        else:
+            print("⚠ Nenhum novo registro para inserir.")
 
     except mysql.connector.Error as e:
-        print(f"Erro ao inserir dados: {e}.")
+        print(f"❌ Erro ao inserir dados: {e}.")
     finally:
         cursor.close()
         conexao.close()
+
 

@@ -1,4 +1,5 @@
 import logging
+from time import sleep
 from requests_html import HTMLSession
 
 
@@ -35,7 +36,7 @@ def raspar_info(url):
     linhas = response.html.xpath('//table/tbody/tr[contains(@class, "borda-superior")]')
 
     if not linhas:
-        print(f"Nenhuma linha encontrada na página: {url}")
+        print(f"⚠ Nenhuma tabela encontrada na página: {url}. Possível mudança no site!")
         return []
 
     # Lista para armazenar os resultados
@@ -50,45 +51,44 @@ def raspar_info(url):
         # Capturar os elementos dentro das colunas
         elemento_doc = colunas[0].xpath('.//a')
 
+
         if elemento_doc:
             elemento_doc = colunas[0].xpath('.//a')[0]
             nome_doc = elemento_doc.text.strip()  # Nome do documento
             link_doc = elemento_doc.attrs.get('href', '').strip()  # Link do PDF
-        else:
-            nome_doc = "N/A"
-            link_doc = "N/A"
+            
 
 
         # Caputurar cada elemento da coluna (N° Proc.|Autuação|Parte 1|Parte 2|Matéria|Objeto|Exercício)
+        num_processo = colunas[1].text.strip().split("\n")[0] if len(colunas) > 1 else "N/A"
+        data_autuacao = colunas[2].text.strip() if len(colunas) > 2 else "N/A"
+        partes = [colunas[3].text.strip(), colunas[4].text.strip()] if len(colunas) > 4 else []
+        partes = [parte for parte in partes if parte]  # Remove strings vazias
+        materia = colunas[5].text.strip() if len(colunas) > 5 else "N/A"
+        ano = colunas[7].text.strip() if len(colunas) > 7 else "N/A"
 
-        num_processo = colunas[1].text.strip().split("\n")[0]
-        data_autuacao = colunas[2].text.strip()
-        parte_1 = colunas[3].text.strip()
-        parte_2 = colunas[4].text.strip()
-        materia = colunas[5].text.strip()
-        objeto = colunas[6].text.strip()
-        ano = colunas[7].text.strip()
 
-        
+        # Criar um dicionário com os resultados        
         resultado = {
             "Nome_Documento": nome_doc,
-            "Link_Documento": link_doc,
             "Numero_Processo": num_processo,
             "Data_Autuacao": data_autuacao,
-            "Parte_1": parte_1,
-            "Parte_2": parte_2,
+            "Partes": partes,
             "Materia": materia,
-            "Objeto": objeto,
+            "URL": link_doc,
             "Ano": ano
         }
-        
-        # Adicionar ao resultado
-        resultados.append(resultado)
+
+        if not nome_doc or not num_processo:
+            print(f"⚠ Alerta: Documento sem nome ou número de processo! Dados: {resultado}")
+        else:
+            # Adicionar ao resultado
+            resultados.append(resultado)
 
     # Exibir os resultados
     return resultados
 
-def obter_total_paginas(url):
+def obter_total_paginas(url, tentativas=3):
     """
     ✅Obtém o total de páginas da URL de pesquisa.
     🔵Retorna o total de páginas encontrado.
@@ -101,11 +101,20 @@ def obter_total_paginas(url):
     session.headers['Connection'] = 'keep-alive'
     session.headers['Upgrade-Insecure-Requests'] = '1'
 
-    response = session.get(url)
+
+    for tentativa in range(1, tentativas + 1):
+        try:
+            response = session.get(url, timeout=10)
     
-    if response.status_code != 200:
-        print(f"Erro ao acessar {url}, Status Code: {response.status_code}")
-        return 1
+            if response.status_code == 200:
+                return response
+            
+            print(f"Erro ao acessar {url}, Status Code: {response.status_code}")
+        except Exception as e:
+            print(f"Erro ao acessar {url}: {e}")
+        sleep(2)
+        print(f"❌ Falha ao acessar {url} após {tentativas} tentativas.")
+        return None
 
     try:
         #caputurar o botão de paginação, posição last() para pegar o último link
