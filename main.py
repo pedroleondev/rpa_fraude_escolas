@@ -20,8 +20,8 @@ DB_CONFIG = {
     "user": os.getenv("DB_USER"),
     "password": os.getenv("DB_PASSWORD"),
 }
-url = "https://www.tce.sp.gov.br/jurisprudencia/pesquisar?txtTdPalvs=fraude+em+prefeitura&processo=&acao=Executa&buscaRapida=true&ignorarEntrada=false"
-
+URL_PESQUISA = "https://www.tce.sp.gov.br/jurisprudencia/pesquisar?txtTdPalvs=fraude+em+prefeitura&processo=&acao=Executa&buscaRapida=true&ignorarEntrada=false"
+URL_OFFSET = "https://www.tce.sp.gov.br/jurisprudencia/pesquisar?acao=Executa&offset={}"
 def raspar_info(url):
 
     """
@@ -89,8 +89,8 @@ def raspar_info(url):
         objeto = colunas[6].text.strip()
         ano = colunas[7].text.strip()
 
-        # Adicionar ao resultado
-        resultados.append({
+        
+        resultado = {
             "Nome_Documento": nome_doc,
             "Link_Documento": link_doc,
             "Numero_Processo": num_processo,
@@ -100,12 +100,79 @@ def raspar_info(url):
             "Materia": materia,
             "Objeto": objeto,
             "Ano": ano
-        })
+        }
+        
+        # Adicionar ao resultado
+        resultados.append(resultado)
 
     # Exibir os resultados
-    for resultado in resultados:
-        print(resultado)
+    return resultados
 
 
+def obter_total_paginas():
+    # Declarar Headers
+    session = HTMLSession()
+    session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0'
+    session.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+    session.headers['Accept-Language'] = 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+    session.headers['Connection'] = 'keep-alive'
+    session.headers['Upgrade-Insecure-Requests'] = '1'
 
-raspar_info(url)
+    response=session.get(URL_PESQUISA)
+    
+
+    try:
+        #caputurar o botão de paginação, posição -1
+        ultimo_link = response.html.xpath('//nav/ul[@class="pagination pagination-sm"]/li[last()]/a/@href')
+
+        if not ultimo_link:
+            return 1 # se não encontrar, assume que há apenas 1 página
+        
+        ultimo_offset = int(ultimo_link[0].split("offset=")[-1])
+        print(ultimo_offset)
+
+        # offset contato de 10 em 10
+
+        total_paginas = (ultimo_offset // 10) + 1
+
+        print(f"Total de páginas encontradas: {total_paginas}")
+        return total_paginas
+
+    except Exception as e:
+        print(f"Erro ao obter total de páginas: {e}")
+        return 1
+
+def raspar_todas_as_paginas(url):
+    
+    #total_paginas = obter_total_paginas()
+    total_paginas = 3
+    dados_coletados = []
+
+    for pagina in range(total_paginas):
+        offset = pagina * 10 # aumentar offset de 10 em 10, confome a paginação
+        url = URL_OFFSET.format(offset)
+        print(f"Raspando página {pagina + 1}/{total_paginas} : {url}")
+
+        resultados = raspar_info(url)
+        if resultados:
+            dados_coletados.extend(resultados) # Adicionar os resultados a lista
+    
+    return dados_coletados
+
+
+# 🟢 Executando a raspagem
+
+dados = raspar_todas_as_paginas(URL_PESQUISA)
+
+if dados:
+    for item in dados[:5]:
+        print(item)
+else:
+    print("Nenhum dado encontrado")
+
+
+#dados = raspar_info(URL_PESQUISA)
+#obter_total_paginas()
+
+# for item in dados:
+#     print(item)
