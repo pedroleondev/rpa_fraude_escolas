@@ -1,27 +1,14 @@
 import os
 import logging
-import psycopg2
-from dotenv import load_dotenv
 from requests_html import HTMLSession
-from bs4 import BeautifulSoup
 import pandas as pd
 
 # Configurar logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Carregar variãveis de ambiente
-load_dotenv()
-
-# Configurações banco de dados
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST"),
-    "port": os.getenv("DB_PORT"),
-    "dbname": os.getenv("DB_NAME"),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
-}
 URL_PESQUISA = "https://www.tce.sp.gov.br/jurisprudencia/pesquisar?txtTdPalvs=fraude+em+prefeitura&processo=&acao=Executa&buscaRapida=true&ignorarEntrada=false"
-URL_OFFSET = "https://www.tce.sp.gov.br/jurisprudencia/pesquisar?acao=Executa&offset={}"
+URL_OFFSET = "https://www.tce.sp.gov.br/jurisprudencia/pesquisar?txtTdPalvs=fraude+em+escolas&acao=Executa&offset={}"
+
 def raspar_info(url):
 
     """
@@ -53,8 +40,16 @@ def raspar_info(url):
         print(f"Erro ao acessar {url}, Status Code: {response.status_code}")
         return []
     
+    
+    # renderizar por javaSCript, 🟡 Tentar evitar utiliziar isso.
+    # response.html.render(sleep=2, timeout=10)
+
     # Encontrar todas as linhas da tabela (cada <tr>)
-    linhas = response.html.xpath('//tbody/tr[contains(@class, "borda-superior")]')
+    linhas = response.html.xpath('//table/tbody/tr[contains(@class, "borda-superior")]')
+
+    if not linhas:
+        print(f"Nenhuma linha encontrada na página: {url}")
+        return []
 
     # Lista para armazenar os resultados
     resultados = []
@@ -67,10 +62,10 @@ def raspar_info(url):
         if len(colunas) < 8:
             continue
 
+        # Capturar os elementos dentro das colunas
         elemento_doc = colunas[0].xpath('.//a')
 
         if elemento_doc:
-            # Capturar os elementos dentro das colunas
             elemento_doc = colunas[0].xpath('.//a')[0]  # Primeiro <a> dentro da 1ª coluna
             nome_doc = elemento_doc.text.strip()  # Nome do documento
             link_doc = elemento_doc.attrs.get('href', '').strip()  # Link do PDF
@@ -108,7 +103,6 @@ def raspar_info(url):
     # Exibir os resultados
     return resultados
 
-
 def obter_total_paginas():
     # Declarar Headers
     session = HTMLSession()
@@ -120,6 +114,9 @@ def obter_total_paginas():
 
     response=session.get(URL_PESQUISA)
     
+    if response.status_code != 200:
+        print(f"Erro ao acessar {URL_PESQUISA}, Status Code: {response.status_code}")
+        return 1
 
     try:
         #caputurar o botão de paginação, posição -1
@@ -129,12 +126,8 @@ def obter_total_paginas():
             return 1 # se não encontrar, assume que há apenas 1 página
         
         ultimo_offset = int(ultimo_link[0].split("offset=")[-1])
-        print(ultimo_offset)
-
-        # offset contato de 10 em 10
-
+        # print(ultimo_offset)
         total_paginas = (ultimo_offset // 10) + 1
-
         print(f"Total de páginas encontradas: {total_paginas}")
         return total_paginas
 
@@ -165,14 +158,9 @@ def raspar_todas_as_paginas(url):
 dados = raspar_todas_as_paginas(URL_PESQUISA)
 
 if dados:
-    for item in dados[:5]:
+    for item in dados[:55]:
         print(item)
 else:
     print("Nenhum dado encontrado")
 
 
-#dados = raspar_info(URL_PESQUISA)
-#obter_total_paginas()
-
-# for item in dados:
-#     print(item)
