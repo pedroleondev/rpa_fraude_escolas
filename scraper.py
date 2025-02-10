@@ -85,6 +85,9 @@ def raspar_info(url):
             # Adicionar ao resultado
             resultados.append(resultado)
 
+            # 🔍 Debug: Verificar quantos registros foram capturados
+            print(f"🔎 Registros raspados até agora: {len(resultados)}")
+
     # Exibir os resultados
     return resultados
 
@@ -101,20 +104,24 @@ def obter_total_paginas(url, tentativas=3):
     session.headers['Connection'] = 'keep-alive'
     session.headers['Upgrade-Insecure-Requests'] = '1'
 
+    response = None
 
     for tentativa in range(1, tentativas + 1):
         try:
             response = session.get(url, timeout=10)
     
             if response.status_code == 200:
-                return response
+                break
             
             print(f"Erro ao acessar {url}, Status Code: {response.status_code}")
         except Exception as e:
             print(f"Erro ao acessar {url}: {e}")
+
         sleep(2)
-        print(f"❌ Falha ao acessar {url} após {tentativas} tentativas.")
-        return None
+        
+        if not response or response.status_code != 200:
+            print(f"❌ Falha ao acessar {url} após {tentativas} tentativas.")
+            return 1
 
     try:
         #caputurar o botão de paginação, posição last() para pegar o último link
@@ -136,15 +143,15 @@ def raspar_todas_as_paginas(url, url_offset):
     ✅Faz a raspagem de todas as páginas da URL fornecida.
     🔵Retorna uma lista com todos os resultados encontrados.
     """
-    #total_paginas = obter_total_paginas(url)
-    total_paginas = 3 # apenas para testes curtos
+    total_paginas = obter_total_paginas(url)
+    #total_paginas = 10 # apenas para testes curtos
     dados_coletados = []
 
     for pagina in range(total_paginas):
         offset = pagina * 10 
         url_completa = url_offset.format(offset)
         print(f"Raspando página {pagina + 1}/{total_paginas} : {url_completa}")
-        resultados = raspar_info(url)
+        resultados = raspar_info(url_completa)
         
         if resultados:
             dados_coletados.extend(resultados) # Adicionar os resultados a lista
