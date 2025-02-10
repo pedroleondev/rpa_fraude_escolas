@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import mysql.connector
 from dotenv import load_dotenv
 
@@ -80,16 +81,35 @@ def inserir_dados(dados):
     cursor = conexao.cursor()
 
 
-    query = """ 
-    INSERT INTO fraudes
-    (nome_documento, link_documento, numero_processo, data_autuacao, parte_1, parte_2, materia, objeto, ano)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    query = """
+        INSERT INTO fraudes 
+        (nome_documento, link_documento, numero_processo, data_autuacao, 
+        parte_1, parte_2, materia, objeto, ano)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     try:
-        cursor.executemany(query, dados)
+        # formatação dos dados antes da inserção (ETL)
+        dados_formatados = [
+            (
+                d["Nome_Documento"],
+                d["Link_Documento"],
+                " ".join(d["Numero_Processo"].split("\n")).strip(),
+                datetime.strptime(d["Data_Autuacao"], "%d/%m/%Y").date() if d["Data_Autuacao"] else None,
+                d["Parte_1"].strip() if d["Parte_1"] else None,
+                d["Parte_2"].strip() if d["Parte_2"] else None,
+                d["Materia"].strip(),
+                d["Objeto"].strip(),
+                int(d["Ano"]) if d["Ano"].isdigit() else None
+            )
+            for d in dados
+        ]
+
+   
+        cursor.executemany(query, dados_formatados)
         conexao.commit()
         print(f"✅ {cursor.rowcount} registro inseridos com sucesso!")
+
     except mysql.connector.Error as e:
         print(f"Erro ao inserir dados: {e}.")
     finally:
